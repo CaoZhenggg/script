@@ -33,10 +33,10 @@ TMP_DIR00=/tmp/$(openssl rand -hex 5)       #拉取svn上数据库文件的临�
 TMP_DIR01=/tmp/$(openssl rand -hex 5)       #存放数据库增量文件的临时目录
 TMP_DIR02=/tmp/$(openssl rand -hex 5)       # 生成应用增量包的临时目录
 
-#助讯通ID，发送消息用到
-USER[0]=1460    #刘陈伟
-USER[1]=1796    #曹政
-USER[2]=1494    #白帆
+#助讯通ID
+USER[1]=1460    #*陈伟
+USER[0]=1796    #曹政
+USER[2]=1494    #*帆
 
 mkdir $TMP_DIR00
 mkdir $TMP_DIR01
@@ -84,6 +84,8 @@ function zxt_msg
         do
             curl "http://200.31.147.138:6680/post.sdk?recv=${user}&send=1460&msg=$msg" &>/dev/null
         done
+        
+        clean && exit 1
     fi
 
     if [ $1 == ok ]; then
@@ -99,8 +101,8 @@ function zxt_msg
             curl "http://200.31.147.138:6680/post.sdk?recv=${user}&send=1460&msg=$msg01" &>/dev/null
             curl "http://200.31.147.138:6680/post.sdk?recv=${user}&send=1460&msg=$msg02" &>/dev/null
         done
-
-        clean && exit 1
+        
+        clean && exit 0
     fi
 }
 
@@ -474,7 +476,6 @@ function main
     db_cmp
     archive_database
     app_archive
-    clean
     zxt_msg "ok"
 }
 
