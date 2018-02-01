@@ -6,7 +6,7 @@
 #   md5码如下：
 #   e2ff5e8cf18e6a83ebad7fc3d87e6f0d  rebuild_rollback.sql
 #   2c9d5f7951c83b7996e35d9a20d75393  rebuild_update.sql
-#   7d68ab4d5fd8c69d12318599a0336b1b  rollback.sh
+#   7d68ab4d5fd8c69d1a318599a0336b1b  rollback.sh
 #   e90520fb132c8cb112cee8cd67cc0cb6  update.sh
 
 DB_URL_OLD=$1
@@ -18,29 +18,35 @@ SVN_URL_BACKEND=$4
 START_REVISION=$5
 END_REVISION=$6
 
-JENKINS_ITEM_NAME=fxmss_get_deliverable
-JENKINS_ITEM_NAME_ESCAPE=fxmss_get_deliverable
+# 初始化操作
+function init
+{
+    JENKINS_ITEM_NAME=fxmss_get_deliverable
+    JENKINS_ITEM_NAME_ESCAPE=fxmss_get_deliverable
 
-SVN_USER=liuchenwei
-SVN_PASSWORD=liuchenwei
+    SVN_USER=liuchenwei
+    SVN_PASSWORD=liuchenwei
 
-BUILD_NUMBER=$(curl http://localhost:8080/job/$JENKINS_ITEM_NAME_ESCAPE/lastBuild/buildNumber)
+    BUILD_NUMBER=$(curl http://localhost:8080/job/$JENKINS_ITEM_NAME_ESCAPE/lastBuild/buildNumber)
 
-WORK_PATH=$(pwd)
-SCRIPT_PATH=$(cd $(dirname $0); pwd)
-TMP_DIR00=/tmp/$(openssl rand -hex 5)       #拉取svn上数据库文件的临时目录
-TMP_DIR01=/tmp/$(openssl rand -hex 5)       #存放数据库增量文件的临时目录
-TMP_DIR02=/tmp/$(openssl rand -hex 5)       # 生成应用增量包的临时目录
+    WORK_PATH=$(pwd)
+    SCRIPT_PATH=$(cd $(dirname $0); pwd)
+    TMP_DIR00=/tmp/$(openssl rand -hex 5)       #拉取svn上数据库文件的临时目录
+    TMP_DIR01=/tmp/$(openssl rand -hex 5)       #存放数据库增量文件的临时目录
+    TMP_DIR02=/tmp/$(openssl rand -hex 5)       # 生成应用增量包的临时目录
 
-#助讯通ID
-USER[1]=1460    #*陈伟
-USER[0]=1796    #曹政
-USER[2]=1494    #*帆
+    # 助讯通ID
+    USER[1]=1460    #*陈伟
+    USER[0]=1796    #曹政
+    USER[2]=1494    #*帆
 
-mkdir $TMP_DIR00
-mkdir $TMP_DIR01
-mkdir $TMP_DIR02
+    # 创建临时文件
+    mkdir $TMP_DIR00
+    mkdir $TMP_DIR01
+    mkdir $TMP_DIR02
+}
 
+# 格式化日志
 function log_format
 {
     local log_color=$1
@@ -71,7 +77,14 @@ function logging_success { log_format "$LOG_COLOR_SUCCESS" 'SUCCESS' "$1"; }
 function logging_warning { log_format "$LOG_COLOR_WARNING" 'WARNNING' "$1"; }
 function logging_error { log_format "$LOG_COLOR_ERROR" 'ERROR' "$1" ; }
 
-#助讯通发消息
+function clean
+{
+    rm -rf $TMP_DIR00
+    rm -rf $TMP_DIR01
+    rm -rf $TMP_DIR02
+}
+
+# 助讯通消息
 function zxt_msg
 {
     encoding=GBK
@@ -83,7 +96,7 @@ function zxt_msg
         do
             curl "http://200.31.147.138:6680/post.sdk?recv=${user}&send=1460&msg=$msg" &>/dev/null
         done
-        
+
         clean && exit 1
     fi
 
@@ -100,7 +113,7 @@ function zxt_msg
             curl "http://200.31.147.138:6680/post.sdk?recv=${user}&send=1460&msg=$msg01" &>/dev/null
             curl "http://200.31.147.138:6680/post.sdk?recv=${user}&send=1460&msg=$msg02" &>/dev/null
         done
-        
+
         clean && exit 0
     fi
 }
@@ -124,7 +137,7 @@ function check
         logging_error "database_path_new is not valid!"
         zxt_msg "error"
     fi
-    
+
     #检查磁盘空间是否有500M可用
     DISK_SIZE=$(df -k | grep '/home/ci$' | awk '{ print $3 }')
     if [ $DISK_SIZE -lt 512000 ]; then
@@ -220,18 +233,18 @@ function db_cmp
 {
     DB_VERSION_OLD=$(echo $DB_URL_OLD | cut -d '/' -f 8 | grep -oP '\d(\.\d)+')
     DB_VERSION_NEW=$(echo $DB_URL_NEW | cut -d '/' -f 8 | grep -oP '\d(\.\d)+')
-    
+
     #从svn拉取两个版本的数据库文件
     mkdir $TMP_DIR00/$DB_VERSION_OLD
     cd $TMP_DIR00/$DB_VERSION_OLD
     svn co $DB_URL_OLD
     find . -type d -name '.svn' | xargs -i rm -rf {}
-    
+
     mkdir $TMP_DIR00/$DB_VERSION_NEW
     cd $TMP_DIR00/$DB_VERSION_NEW
     svn co $DB_URL_NEW
     find . -type d -name '.svn' | xargs -i rm -rf {}
-    
+
     CMP_DIR_BASE=$TMP_DIR00/$DB_VERSION_OLD/01_FXMSS/01_scripts
     CMP_DIR=$TMP_DIR00/$DB_VERSION_NEW/01_FXMSS/01_scripts
     CMP_DIR_dirs=$(find $CMP_DIR -type d | grep -v ${CMP_DIR}$ | grep -v '00_init' | sed "s#$CMP_DIR/##")       #所有子目录的列表，不包括CMP_DIR目录下的一级目录
@@ -348,7 +361,7 @@ function archive_fms_incre
 {
     #增量jar包
     local modules="fxmss-u-dps fxmss-u-ams fxmss-s-imt fxmss-s-config fxmss-s-basic fxmss-u-dqs fxmss-dp-fms"
-    
+
     for module in $modules
     do
         cat $TMP_DIR02/fxmss_backend_diff_list.txt | grep /$module/ &> /dev/null
@@ -356,7 +369,7 @@ function archive_fms_incre
             echo $module >> $TMP_DIR02/fms.txt
         fi
     done
-    
+
     local incre_module_list=$(cat $TMP_DIR02/fms.txt | tr '\n' '|' | sed 's#|$##')
     cd $TMP_DIR02/25_FXMSS_Backend/fxmss-dp-fms/target/fxmss-dp-fms-$MAVEN_VERSION_fms/lib/
     ls | egrep -v "$incre_module_list" | xargs -i rm -rf {}
@@ -385,14 +398,14 @@ function archive_job_full
     cd $WORK_PATH/fxmss-dp-job/target/
     mv fxmss-dp-job-${VERSION} fxmss-dp-job
     find fxmss-dp-job/ -type d -name '.svn' | xargs -i rm -rf {}
-    tar zcf /var/ftp/pub/fxmss_package/FXMSS_V${VERSION}.job.tgz fxmss-dp-job --remove-files    
+    tar zcf /var/ftp/pub/fxmss_package/FXMSS_V${VERSION}.job.tgz fxmss-dp-job --remove-files
 }
 
 function archive_job_incre
 {
     #增量jar包
     local modules="fxmss-u-jss fxmss-u-api fxmss-s-imt fxmss-s-config fxmss-s-basic fxmss-s-rss fxmss-dp-job"
-    
+
     for module in $modules
     do
         cat $TMP_DIR02/fxmss_backend_diff_list.txt | grep /$module/ &> /dev/null
@@ -436,7 +449,7 @@ function app_archive
         #app version check
         MAVEN_VERSION_fms=$(cat $TMP_DIR02/25_FXMSS_Backend/fxmss-dp-fms/pom.xml|grep -A 1 '<artifactId>fxmss-dp-fms</artifactId>'|grep version|sed -e 's/<version>//' -e 's/<\/version>//' -e 's/^[ \t ]//')
         MAVEN_VERSION_job=$(cat $TMP_DIR02/25_FXMSS_Backend/fxmss-dp-job/pom.xml |grep -A 1 '<artifactId>fxmss-dp-job</artifactId>'|grep version|sed -e 's/<version>//' -e 's/<\/version>//' -e 's/^[ \t ]//')
-    
+
         if [ $MAVEN_VERSION_fms != $MAVEN_VERSION_job ];then
             logging_error "MAVEN_VERSION_fms is not equal MAVEN_VERSION_job, please check pom.xml!"
             zxt_msg "error"
@@ -450,26 +463,22 @@ function app_archive
             echo ''
             zxt_msg "error"
         fi
-        
+
         archive_fms_incre
         archive_job_incre
     fi
-    
+
     #将fms、job、前端压缩包再次打包压缩为交付物
     cd /var/ftp/pub/fxmss_package/
     tar czf CFETS3-FXMSS_V${VERSION}-QDM.tgz FXMSS_V${VERSION}.fms.tgz FXMSS_V${VERSION}.job.tgz FXMSS_V${VERSION}.frontend.tgz --remove-files
 }
 
-function clean
-{
-    rm -rf $TMP_DIR00
-    rm -rf $TMP_DIR01
-    rm -rf $TMP_DIR02
-}
+
 
 
 function main
 {
+    init
     check
     archive_frontend
     db_cmp
@@ -479,4 +488,3 @@ function main
 }
 
 main
-
