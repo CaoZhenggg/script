@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # _*_ coding: utf-8 _*_
 # Author: CaoZheng
-# Date: 2017/11/06
 
 
 from __future__ import print_function
