@@ -1,6 +1,5 @@
 #!/bin/bash
 #Author: CaoZheng
-#Date: 2017/07/25
 
 
 Script_Path=$(dirname $0)
