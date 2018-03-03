@@ -1,6 +1,5 @@
 #!/bin/bash
 #author: Cao Zheng
-#date: 2017/10/10
 
 read -p "Please input path: " path
 if [ ! -d $path ];then
